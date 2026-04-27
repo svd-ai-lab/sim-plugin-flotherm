@@ -195,14 +195,26 @@ class FlothermDriver:
             message=f"Unsupported file type '{script.suffix}'.")])
 
     def _find_schema_dir(self) -> Path | None:
-        """Locate FloSCRIPT XSD schemas from sim-skills."""
-        from sim.compat import find_skills_root
+        """Locate FloSCRIPT XSD schemas bundled with this plugin.
 
-        skills_root = find_skills_root()
-        if skills_root is None:
+        After extraction the schemas live under the plugin's own
+        ``_skills/`` tree, exposed via ``sim_plugin_flotherm.skills_dir``.
+        For an extracted/editable install ``files()`` resolves to a real
+        on-disk directory and we can return it as a :class:`Path`.
+        Non-extracted (zipped) wheels are not supported here — the lint
+        flow will treat a ``None`` return as "no schema, skip XSD
+        validation" exactly as before.
+        """
+        from sim_plugin_flotherm import skills_dir
+
+        try:
+            skills_root = Path(str(skills_dir))
+        except TypeError:
+            return None
+        if not skills_root.is_dir():
             return None
 
-        # Use detected version, fall back to scanning available versions
+        # Use detected version, fall back to scanning available versions.
         version = None
         info = self._install or find_installation()
         if info:
@@ -210,27 +222,20 @@ class FlothermDriver:
 
         if version:
             schema_dir = (
-                skills_root / "flotherm" / "reference" / "flotherm"
-                / version / "examples" / "floscript" / "schema"
-            )
-            if schema_dir.is_dir():
-                return schema_dir
-            # Also try base/reference path variant
-            schema_dir = (
-                skills_root / "flotherm" / "base" / "reference" / "flotherm"
-                / version / "examples" / "floscript" / "schema"
+                skills_root / "flotherm" / version
+                / "examples" / "floscript" / "schema"
             )
             if schema_dir.is_dir():
                 return schema_dir
 
-        # Fallback: find any available schema directory
-        for pattern in (
-            "flotherm/reference/flotherm/*/examples/floscript/schema",
-            "flotherm/base/reference/flotherm/*/examples/floscript/schema",
-        ):
-            matches = sorted(skills_root.glob(pattern), reverse=True)
-            if matches:
-                return matches[0]
+        # Fallback: any version-stamped schema dir bundled in the plugin.
+        matches = sorted(
+            skills_root.glob(
+                "flotherm/*/examples/floscript/schema"),
+            reverse=True,
+        )
+        if matches:
+            return matches[0]
 
         return None
 
