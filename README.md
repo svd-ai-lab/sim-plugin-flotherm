@@ -39,10 +39,31 @@ flotherm = "sim_plugin_flotherm:skills_dir"
 git clone https://github.com/svd-ai-lab/sim-plugin-flotherm
 cd sim-plugin-flotherm
 uv sync --extra test
-uv run --extra test python -m pytest
+uv run --extra test python -m pytest --basetemp=.tmp/pytest-basetemp
 ```
 
 Note: Tier-4 (real Flotherm) tests require Windows + a licensed Simcenter Flotherm install. Tier-1 / Tier-2 tests (detect, lint, FloSCRIPT/FloXML builders) run on macOS / Linux.
+
+## Windows smoke
+
+Run these from an interactive Windows desktop/RDP session:
+
+```powershell
+$sim = ".\.venv\Scripts\sim.exe"
+$pack = "C:\Program Files\Siemens\SimcenterFlotherm\2504\examples\Demonstration Models\Superposition\SuperPosition.pack"
+
+& $sim stop
+Start-Process -FilePath $sim -ArgumentList "serve","--host","127.0.0.1","--port","7600" -WindowStyle Hidden
+& $sim --json connect --solver flotherm --ui-mode no_gui  # expected: unsupported
+& $sim --json connect --solver flotherm --ui-mode gui
+& $sim --json exec $pack
+& $sim --json exec solve
+& $sim --json exec status
+& $sim disconnect
+& $sim stop
+```
+
+`exec solve` should return `state: "succeeded"` and `status` should include `solve_log.state: "succeeded"` from `DataSets/BaseSolution/PDTemp/logit`.
 
 ## License
 

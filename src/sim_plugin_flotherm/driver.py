@@ -40,6 +40,7 @@ from ._helpers import (
     default_flouser,
     detect_job_state,
     find_installation,
+    read_solve_log,
     snapshot_result_files,
     tail_logfile_xml,
 )
@@ -420,6 +421,8 @@ class FlothermDriver:
 
         # .pack file → import project into GUI via FloSCRIPT project_import
         if text.lower().endswith(".pack") and os.path.isfile(text):
+            previous_project = self._project
+            previous_active = (self._session or {}).get("active_project")
             result = self.load_project(Path(text))
             # Clean up extracted dir so project_import can re-extract
             import shutil
@@ -435,6 +438,17 @@ class FlothermDriver:
             )
             script_path = self._write_script(import_script, "import_project")
             gui_result = self._play_floscript(script_path)
+            if not gui_result.get("ok", False):
+                self._project = previous_project
+                if self._session is not None:
+                    self._session["active_project"] = previous_active
+                return {
+                    "ok": False,
+                    "action": "import_project",
+                    **result,
+                    "gui": gui_result,
+                    "error": gui_result.get("error", "GUI project import failed"),
+                }
             return {"ok": True, "action": "import_project", **result, "gui": gui_result}
 
         # .xml FloSCRIPT → play via GUI automation
@@ -451,6 +465,16 @@ class FlothermDriver:
         if text.lower() == "solve":
             if self._project is None:
                 return {"ok": False, "error": "No project loaded. Load a .pack first."}
+            session = self._session or {}
+            field_dir = os.path.join(
+                session.get("workspace", ""),
+                self._project["project_dir"],
+                "DataSets",
+                "BaseSolution",
+            )
+            pre_snapshot = snapshot_result_files(field_dir)
+            floerror_baseline, _, _ = read_floerror_log(session.get("workspace", ""))
+
             # Project is already loaded in GUI after import — just start solver
             script_content = (
                 '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -460,7 +484,51 @@ class FlothermDriver:
             )
             script_path = self._write_script(script_content, label or "solve")
             gui_result = self._play_floscript(script_path)
-            return {"ok": True, "action": "solve", "script": script_path, "gui": gui_result}
+            if not gui_result.get("ok", False):
+                return {
+                    "ok": False,
+                    "action": "solve",
+                    "script": script_path,
+                    "gui": gui_result,
+                    "error": gui_result.get("error", "GUI solve dispatch failed"),
+                }
+
+            timeout_s = float(os.environ.get("SIM_FLOTHERM_SOLVE_TIMEOUT", "300"))
+            poll_interval = float(os.environ.get("SIM_FLOTHERM_SOLVE_POLL", "2"))
+            start = time.monotonic()
+            state = "running"
+            reasons: list[str] = []
+            while (time.monotonic() - start) < timeout_s:
+                elapsed = time.monotonic() - start
+                state, reasons = detect_job_state(
+                    workspace=session.get("workspace", ""),
+                    project_dir=self._project["project_dir"],
+                    pre_solve_snapshot=pre_snapshot,
+                    process_pid=session.get("process_pid"),
+                    elapsed_s=elapsed,
+                    timeout_s=timeout_s,
+                    floerror_baseline=floerror_baseline,
+                )
+                if state in ("succeeded", "failed", "timeout"):
+                    break
+                time.sleep(poll_interval)
+            else:
+                state = "timeout"
+                reasons.append(f"solve poll exhausted after {timeout_s:.0f}s")
+
+            return {
+                "ok": state == "succeeded",
+                "action": "solve",
+                "script": script_path,
+                "gui": gui_result,
+                "state": state,
+                "state_reasons": reasons,
+                "elapsed_s": round(time.monotonic() - start, 3),
+                "solve_log": read_solve_log(
+                    session.get("workspace", ""),
+                    self._project["project_dir"],
+                ),
+            }
 
         # "status" → query status
         if text.lower() == "status":
@@ -685,11 +753,12 @@ class FlothermDriver:
         last_job = list(self._jobs.values())[-1] if self._jobs else None
         proc_alive = False
         if self._session and self._session.get("process_pid"):
-            proc_alive = is_process_alive(self._session["process_pid"])
+            proc_alive = bool(is_process_alive(self._session["process_pid"]))
         logs: dict[str, list[dict]] = {
             "floerror": [],
             "gui_log": [],
         }
+        solve_log: dict | None = None
         if self._session:
             workspace = self._session.get("workspace")
             install_root = self._session.get("install_root")
@@ -697,6 +766,8 @@ class FlothermDriver:
                 logs["floerror"] = parse_error_log(workspace)
             if install_root:
                 logs["gui_log"] = tail_logfile_xml(install_root)
+            if workspace and self._project:
+                solve_log = read_solve_log(workspace, self._project["project_dir"])
         return {
             "session": self._session,
             "active_project": self._project,
@@ -704,6 +775,7 @@ class FlothermDriver:
             "total_jobs": len(self._jobs),
             "process_alive": proc_alive,
             "logs": logs,
+            "solve_log": solve_log,
         }
 
     def query_artifacts(self, job_id: str | None = None) -> dict:

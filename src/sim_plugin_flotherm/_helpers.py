@@ -164,6 +164,15 @@ FIELD_NAMES = (
     "XVelocity", "YVelocity", "ZVelocity", "TurbVis",
 )
 
+_LOGIT_SUCCESS_PATTERNS = (
+    re.compile(r"\bstatus\s+\d+\s+normal exit from main program", re.IGNORECASE),
+    re.compile(r"\bI/9001\b.*\bconverged\b", re.IGNORECASE),
+    re.compile(r"\bsolver stopped:.*\bconverged\b", re.IGNORECASE),
+)
+_LOGIT_FAILURE_PATTERNS = (
+    re.compile(r"\b(abnormal|fatal|error)\b", re.IGNORECASE),
+)
+
 
 def snapshot_result_files(field_dir: str) -> dict[str, float]:
     """Record modification times of field result files."""
@@ -204,6 +213,39 @@ def is_process_alive(pid: int | None) -> bool:
         return str(pid) in stdout
     except Exception:
         return False
+
+
+def read_solve_log(
+    workspace: str,
+    project_dir: str,
+    *,
+    max_chars: int = 4000,
+) -> dict:
+    """Return tail and coarse terminal state from `PDTemp/logit`.
+
+    The GUI process remains alive after a solve, so process liveness is not a
+    terminal signal. The solver writes `DataSets/BaseSolution/PDTemp/logit`;
+    observed 2504 examples use different numeric status codes, but the
+    `normal exit from main program MAINUU` suffix is the completion marker.
+    """
+    path = os.path.join(
+        workspace, project_dir, "DataSets", "BaseSolution", "PDTemp", "logit",
+    )
+    if not os.path.isfile(path):
+        return {"path": path, "exists": False, "state": "unknown", "tail": ""}
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            text = f.read()
+    except OSError:
+        return {"path": path, "exists": True, "state": "unknown", "tail": ""}
+
+    tail = text[-max_chars:]
+    state = "unknown"
+    if any(p.search(text) for p in _LOGIT_FAILURE_PATTERNS):
+        state = "failed"
+    if any(p.search(text) for p in _LOGIT_SUCCESS_PATTERNS):
+        state = "succeeded"
+    return {"path": path, "exists": True, "state": state, "tail": tail}
 
 
 def detect_job_state(
@@ -263,6 +305,12 @@ def detect_job_state(
     elif all_fatals and not has_fatal:
         reasons.append(f"Historical errors (ignored): {len(all_fatals)}")
 
+    solve_log = read_solve_log(workspace, project_dir)
+    if solve_log["exists"]:
+        reasons.append(f"PDTemp/logit state: {solve_log['state']}")
+    else:
+        reasons.append("PDTemp/logit not found")
+
     proc_alive = is_process_alive(process_pid)
     if proc_alive:
         reasons.append(f"Process PID {process_pid} still alive")
@@ -275,6 +323,10 @@ def detect_job_state(
 
     if has_fatal:
         return "failed", reasons
+    if solve_log["state"] == "failed":
+        return "failed", reasons
+    if solve_log["state"] == "succeeded":
+        return "succeeded", reasons
     if fields_changed:
         return "succeeded", reasons
     if proc_alive and not timed_out:

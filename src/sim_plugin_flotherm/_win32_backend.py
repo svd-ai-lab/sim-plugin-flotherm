@@ -43,7 +43,17 @@ def _drain(pipe) -> str:
 _UIA_MENU_TRIGGER = """\
 import time
 from pywinauto.application import Application
-app = Application(backend="uia").connect(title_re=".*Simcenter Flotherm.*", found_index=0)
+deadline = time.monotonic() + 30
+last_error = None
+while True:
+    try:
+        app = Application(backend="uia").connect(title_re=".*Simcenter Flotherm.*", found_index=0)
+        break
+    except Exception as exc:
+        last_error = exc
+        if time.monotonic() >= deadline:
+            raise last_error
+        time.sleep(0.5)
 win = app.window(title_re=".*Simcenter Flotherm.*", found_index=0)
 macro = win.child_window(control_type="MenuBar", found_index=0).child_window(title="Macro", control_type="MenuItem")
 macro.expand()
