@@ -33,6 +33,7 @@ dependencies = [
 [project.optional-dependencies]
 test = [
     "pytest>=7",
+    "build>=1.0",
 ]
 
 [project.entry-points."sim.drivers"]
@@ -40,6 +41,9 @@ flotherm = "sim_plugin_flotherm:FlothermDriver"
 
 [project.entry-points."sim.skills"]
 flotherm = "sim_plugin_flotherm:skills_dir"
+
+[project.entry-points."sim.plugins"]
+flotherm = "sim_plugin_flotherm:plugin_info"
 
 [project.urls]
 Homepage = "https://github.com/svd-ai-lab/sim-plugin-flotherm"
@@ -50,3 +54,6 @@ packages = ["src/sim_plugin_flotherm"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+  "integration: tests that build wheels or touch external tooling",
+]
