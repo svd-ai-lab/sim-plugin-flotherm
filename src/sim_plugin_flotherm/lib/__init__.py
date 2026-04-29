@@ -26,8 +26,12 @@ from .error_log import (
 )
 from .floscript import (
     build_custom,
+    build_project_save,
+    build_project_save_as,
     build_solve_and_save,
     build_solve_scenario,
+    build_start_record_script,
+    build_stop_record_script,
     lint_floscript,
 )
 from .floxml import lint_floxml
@@ -67,8 +71,12 @@ __all__ = [
     "Project",
     "SolutionDomain",
     "build_custom",
+    "build_project_save",
+    "build_project_save_as",
     "build_solve_and_save",
     "build_solve_scenario",
+    "build_start_record_script",
+    "build_stop_record_script",
     "lint_floscript",
     "lint_floxml",
     "lint_pack",

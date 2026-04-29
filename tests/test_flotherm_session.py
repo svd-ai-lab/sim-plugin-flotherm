@@ -135,6 +135,30 @@ def test_dispatch_xml_lints_before_gui_play(tmp_path: Path) -> None:
     assert result["diagnostics"][0]["message"] == "Line 1: bad element"
 
 
+def test_run_preserves_dispatch_diagnostics(tmp_path: Path) -> None:
+    script = tmp_path / "bad.xml"
+    script.write_text(
+        '<?xml version="1.0"?><xml_log_file version="1.0"><bad/></xml_log_file>',
+        encoding="utf-8",
+    )
+    driver = FlothermDriver()
+    driver.probes = []
+    driver._session = {
+        "state": "ready",
+        "workspace": str(tmp_path),
+        "install_root": str(tmp_path),
+    }
+    driver.lint = lambda path: LintResult(  # type: ignore[method-assign]
+        ok=False,
+        diagnostics=[Diagnostic(level="error", message="schema says no")],
+    )
+
+    result = driver.run(str(script))
+
+    assert result["ok"] is False
+    assert result["diagnostics"][0]["message"] == "schema says no"
+
+
 def test_dispatch_solve_menu_uses_gui_helper(tmp_path: Path) -> None:
     driver = FlothermDriver()
     driver._session = {
@@ -159,6 +183,62 @@ def test_dispatch_solve_menu_uses_gui_helper(tmp_path: Path) -> None:
     assert result["action"] == "solve_menu"
     assert result["gui"]["method"] == "subprocess_uia_solve_menu"
     assert result["gui"]["handled_save_project_dialog"] is True
+
+
+def test_dispatch_save_as_generates_and_syncs_project(tmp_path: Path) -> None:
+    driver = FlothermDriver()
+    driver._session = {
+        "state": "ready",
+        "workspace": str(tmp_path),
+        "install_root": str(tmp_path),
+    }
+
+    saved = tmp_path / "NamedProject.XYZ"
+    group = saved / "PDProject" / "group"
+    group.parent.mkdir(parents=True)
+    group.write_text("project", encoding="utf-8")
+
+    driver.lint = lambda path: LintResult(ok=True, diagnostics=[])  # type: ignore[method-assign]
+    driver._play_floscript = lambda path: {"ok": True}  # type: ignore[method-assign]
+
+    result = driver._dispatch("save_as NamedProject")
+
+    assert result["ok"] is True
+    assert result["action"] == "project_save_as"
+    script = Path(result["script"]).read_text(encoding="utf-8")
+    assert 'project_name="NamedProject"' in script
+    assert 'save_with_results="true"' in script
+    assert driver._project is not None
+    assert driver._project["project_dir"] == "NamedProject.XYZ"
+
+
+def test_dispatch_record_controls_generate_scripts(tmp_path: Path) -> None:
+    driver = FlothermDriver()
+    driver._session = {
+        "state": "ready",
+        "workspace": str(tmp_path),
+        "install_root": str(tmp_path),
+    }
+    played: list[str] = []
+
+    driver.lint = lambda path: LintResult(ok=True, diagnostics=[])  # type: ignore[method-assign]
+
+    def fake_play(path: str) -> dict:
+        played.append(Path(path).read_text(encoding="utf-8"))
+        return {"ok": True}
+
+    driver._play_floscript = fake_play  # type: ignore[method-assign]
+
+    start = driver._dispatch(r"record_start C:\tmp\record.xml")
+    stop = driver._dispatch("record_stop")
+
+    assert start["ok"] is True
+    assert start["action"] == "record_start"
+    assert start["file_name"] == r"C:\tmp\record.xml"
+    assert 'file_name="C:\\tmp\\record.xml"' in played[0]
+    assert stop["ok"] is True
+    assert stop["action"] == "record_stop"
+    assert "<stop_record_script/>" in played[1]
 
 
 def test_dispatch_xml_syncs_active_project_after_playback(tmp_path: Path) -> None:

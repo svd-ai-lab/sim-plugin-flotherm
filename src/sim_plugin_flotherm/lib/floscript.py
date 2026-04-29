@@ -131,6 +131,53 @@ def build_solve_and_save(project_name: str) -> str:
     return _pretty_xml(root)
 
 
+def build_project_save() -> str:
+    """Build FloSCRIPT to save the current active project."""
+    root = Element("xml_log_file", version="1.0")
+    SubElement(root, "project_save")
+    return _pretty_xml(root)
+
+
+def build_project_save_as(
+    project_name: str,
+    *,
+    project_title: str | None = None,
+    project_notes: str | None = None,
+    solution_directory: str | None = None,
+    project_category: str | None = None,
+    save_with_results: bool | None = None,
+) -> str:
+    """Build FloSCRIPT to save the active project under a stable name."""
+    attrs = {"project_name": project_name}
+    if project_title is not None:
+        attrs["project_title"] = project_title
+    if project_notes is not None:
+        attrs["project_notes"] = project_notes
+    if solution_directory is not None:
+        attrs["solution_directory"] = solution_directory
+    if project_category is not None:
+        attrs["project_category"] = project_category
+    if save_with_results is not None:
+        attrs["save_with_results"] = "true" if save_with_results else "false"
+    root = Element("xml_log_file", version="1.0")
+    SubElement(root, "project_save_as", **attrs)
+    return _pretty_xml(root)
+
+
+def build_start_record_script(file_name: str) -> str:
+    """Build FloSCRIPT to start GUI FloSCRIPT recording to ``file_name``."""
+    root = Element("xml_log_file", version="1.0")
+    SubElement(root, "start_record_script", file_name=file_name)
+    return _pretty_xml(root)
+
+
+def build_stop_record_script() -> str:
+    """Build FloSCRIPT to stop GUI FloSCRIPT recording."""
+    root = Element("xml_log_file", version="1.0")
+    SubElement(root, "stop_record_script")
+    return _pretty_xml(root)
+
+
 def build_solve_scenario(project_name: str, scenario_id: str) -> str:
     """Build FloSCRIPT to solve a specific scenario."""
     root = Element("xml_log_file", version="1.0")

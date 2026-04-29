@@ -5,8 +5,12 @@ from xml.etree import ElementTree
 
 from sim_plugin_flotherm.lib.floscript import (
     build_custom,
+    build_project_save,
+    build_project_save_as,
     build_solve_and_save,
     build_solve_scenario,
+    build_start_record_script,
+    build_stop_record_script,
 )
 
 
@@ -31,6 +35,33 @@ def test_build_solve_scenario_wraps_in_external_command():
     sid = solve.find("scenario_id")
     assert sid is not None
     assert sid.attrib.get("scenario_id") == "S1"
+
+
+def test_build_project_save_produces_project_save_command():
+    xml = build_project_save()
+    root = ElementTree.fromstring(xml)
+    assert root.find("project_save") is not None
+
+
+def test_build_project_save_as_sets_project_name_and_title():
+    xml = build_project_save_as("NamedProject", project_title="Named title")
+    root = ElementTree.fromstring(xml)
+    cmd = root.find("project_save_as")
+    assert cmd is not None
+    assert cmd.attrib["project_name"] == "NamedProject"
+    assert cmd.attrib["project_title"] == "Named title"
+
+
+def test_build_record_controls_use_schema_attribute_names():
+    start_xml = build_start_record_script(r"C:\tmp\record.xml")
+    start_root = ElementTree.fromstring(start_xml)
+    start = start_root.find("start_record_script")
+    assert start is not None
+    assert start.attrib["file_name"] == r"C:\tmp\record.xml"
+
+    stop_xml = build_stop_record_script()
+    stop_root = ElementTree.fromstring(stop_xml)
+    assert stop_root.find("stop_record_script") is not None
 
 
 def test_build_custom_handles_nested_children():

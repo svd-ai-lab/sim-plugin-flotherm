@@ -45,7 +45,11 @@ from ._helpers import (
     tail_logfile_xml,
 )
 from .lib import (
+    build_project_save,
+    build_project_save_as,
     build_solve_and_save,
+    build_start_record_script,
+    build_stop_record_script,
     lint_floscript,
     lint_floxml,
     lint_pack,
@@ -389,6 +393,7 @@ class FlothermDriver:
         t0 = _t.monotonic()
         result = self._dispatch(code, label)
         wall = _t.monotonic() - t0
+        dispatch_diagnostics = list(result.get("diagnostics", []))
 
         ctx = InspectCtx(
             stdout="",
@@ -401,7 +406,7 @@ class FlothermDriver:
             workdir_before=before,
         )
         diags, arts = collect_diagnostics(self.probes, ctx)
-        result["diagnostics"] = [d.to_dict() for d in diags]
+        result["diagnostics"] = dispatch_diagnostics + [d.to_dict() for d in diags]
         result["artifacts"] = [a.to_dict() for a in arts]
         return result
 
@@ -411,6 +416,8 @@ class FlothermDriver:
         Supported commands:
           - A path to a .pack file → load_project() + play FloSCRIPT to open in GUI
           - A path to a .xml FloSCRIPT → play it via GUI automation
+          - "save" / "save_as <name>" → save the active GUI project
+          - "record_start <path>" / "record_stop" → control FloSCRIPT recording
           - "solve" → generate solve FloSCRIPT and play via GUI
           - "solve_menu" → click Solve > Solve in the GUI
           - "status" → query_status()
@@ -499,6 +506,39 @@ class FlothermDriver:
                 "gui": gui_result,
             }
 
+        if text.lower() in ("save", "project_save"):
+            return self._play_generated_floscript(
+                build_project_save(),
+                "project_save",
+                sync_active_project=True,
+            )
+
+        save_as_match = re.match(r"^(?:save_as|project_save_as)\s+(.+)$", text, re.I)
+        if save_as_match:
+            project_name = save_as_match.group(1).strip().strip("\"'")
+            if not project_name:
+                return {"ok": False, "error": "save_as requires a project name."}
+            return self._play_generated_floscript(
+                build_project_save_as(project_name, save_with_results=True),
+                "project_save_as",
+                sync_active_project=True,
+            )
+
+        record_start_match = re.match(r"^record_start\s+(.+)$", text, re.I)
+        if record_start_match:
+            filename = str(Path(record_start_match.group(1).strip().strip("\"'")))
+            return self._play_generated_floscript(
+                build_start_record_script(filename),
+                "record_start",
+                extra={"file_name": filename},
+            )
+
+        if text.lower() in ("record_stop", "stop_record"):
+            return self._play_generated_floscript(
+                build_stop_record_script(),
+                "record_stop",
+            )
+
         # "solve" → play solve FloSCRIPT via GUI
         if text.lower() == "solve":
             if self._project is None:
@@ -576,8 +616,53 @@ class FlothermDriver:
         return {
             "ok": False,
             "error": f"Unknown command: {text!r}. "
-                     "Use a .pack path, .xml path, 'solve', 'status', or '#!python ...'.",
+                     "Use a .pack path, .xml path, 'save', 'save_as <name>', "
+                     "'record_start <path>', 'record_stop', 'solve', 'status', "
+                     "or '#!python ...'.",
         }
+
+    def _play_generated_floscript(
+        self,
+        script_content: str,
+        label: str,
+        *,
+        sync_active_project: bool = False,
+        extra: dict | None = None,
+    ) -> dict:
+        """Write, lint, and play a generated FloSCRIPT snippet."""
+        script_path = self._write_script(script_content, label)
+        lint_result = self.lint(Path(script_path))
+        lint_errors = [
+            diagnostic for diagnostic in lint_result.diagnostics
+            if diagnostic.level == "error"
+        ]
+        if lint_errors:
+            return {
+                "ok": False,
+                "action": "lint_floscript",
+                "script": script_path,
+                "diagnostics": [
+                    {
+                        "level": diagnostic.level,
+                        "message": diagnostic.message,
+                        "line": diagnostic.line,
+                    }
+                    for diagnostic in lint_result.diagnostics
+                ],
+                "error": "Generated FloSCRIPT failed lint; not dispatching to GUI",
+            }
+        gui_result = self._play_floscript(script_path)
+        if sync_active_project and gui_result.get("ok", False):
+            self._sync_active_project_from_workspace()
+        result = {
+            "ok": gui_result.get("ok", False),
+            "action": label,
+            "script": script_path,
+            "gui": gui_result,
+        }
+        if extra:
+            result.update(extra)
+        return result
 
     def _exec_python(self, code: str) -> dict:
         """Execute raw Python in the server process (dev mode).
