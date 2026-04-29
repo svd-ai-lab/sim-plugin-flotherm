@@ -1,6 +1,6 @@
 # Simcenter Flotherm 2410 (2024.3) notes
 
-Tested 2026-04-12 on DESKTOP-623UBP1 alongside 2504.
+Tested 2026-04-12 alongside 2504.
 
 ## Same behavior as 2504
 
@@ -17,9 +17,9 @@ Tested 2026-04-12 on DESKTOP-623UBP1 alongside 2504.
 
 - `flotherm.bat -b` — batch mode broken upstream (RunTable exception)
 - `flotherm.bat -f` — CLI FloSCRIPT playback silently dropped
-- `translator.exe` + `solexe.exe` headless path — **crashes with
-  0xC0000005 (access violation) on DESKTOP-623UBP1**. Same symptom
-  as 2504 on this machine. See [sim-cli#14].
+- `translator.exe` + `solexe.exe` headless path — **can crash with
+  0xC0000005 (access violation)** in Windows headless/session-0
+  contexts. Same symptom has been observed on 2504. See [sim-cli#14].
 
 ## No version-specific deltas discovered yet
 

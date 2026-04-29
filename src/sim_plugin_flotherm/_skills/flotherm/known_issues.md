@@ -62,7 +62,7 @@ solexe.exe -p "<FLOUSERDIR>\<ProjectName>.<GUID>"
 ```
 
 **Verified on**: Mobile_Demo_Steady_State (153K cells, 2 domains)  
-**Environment**: SSH session to win1 (no interactive desktop, no GUI)  
+**Environment**: Windows SSH/session-0 context (no interactive desktop, no GUI)  
 **Solver output**: 500 iterations, single precision, serial, status 4 (max iterations hit)  
 **Solver time**: CPU 1:07, Clock 1:41  
 **Evidence**: `logit` shows real residuals, Temperature ~35°C, field files modified in `msp_0/end/`

@@ -52,7 +52,7 @@ If no valid acceptance criterion exists, ask the user:
 - **[REQUIRED]** `conn.status == "ok"`
 - **[REQUIRED]** `conn.version` is non-null and non-empty
 - **[REQUIRED]** `conn.message` references the detected `flotherm.bat` path
-- **[RECOMMENDED]** `conn.version == "2504"` (expected version on this machine)
+- **[RECOMMENDED]** `conn.version` matches the version required by the project fixtures or workflow under test
 
 ### What "task complete" does NOT mean here
 - Flotherm can be found — it also needs to be the correct version for the project being run
