@@ -20,7 +20,7 @@ Flotherm prefixes diagnostic lines with `ERROR   E/<NNNNN>`, `WARN  W/<NNNNN>`, 
 1. **`<install>\WinXP\bin\LogFiles\logFile<timestamp>.xml`** — auto-recorded every GUI session, up to 5 retained. Each diagnostic appears as `<message text="ERROR …"/>`. Easiest channel for headless monitoring (file read; no UIA round-trip).
 2. **`%FLOUSERDIR%\<project>\floerror.log`** — persistent per-project log. Some 11xxx codes (notably `E/11029`) are written **only** here, not to stderr.
 
-The same code may appear in either or both channels. The driver's `lib/error_log.py` parses `floerror.log` today; a `tail_logfile_xml()` helper for the GUI log is on the roadmap (sim-cli; see comment at the bottom of this file).
+The same code may appear in either or both channels. The driver's `lib/error_log.py` parses both `floerror.log` and the GUI XML logs; `tail_logfile_xml()` reads the most recent GUI log, and GUI playback responses surface new entries as `gui_log` / `gui_log_errors`.
 
 ## Catalogue
 
@@ -45,6 +45,7 @@ The same code may appear in either or both channels. The driver's `lib/error_log
 | `E/11008` | error | `Failed to import …` | `<project_import>` was called with an `import_type` that doesn't match the GUI menu text — e.g. `"pack"` instead of `"Pack File"`. | Validate `import_type` ∈ {`"Pack File"`, `"FloXML"`, `"PDML"`, …} before dispatch; recommend re-emit with the canonical value. |
 | `E/11013` | error | `Failed to get a lock: If project not already in use Select [Project/Load…/Unlock] to unlock` | A previous Flotherm session crashed leaving `group.lck` / `notes.lck`, or another process has the project open. | `<project_unlock project_name="…"/>` first, retry `<project_load>`. If repeated, fall back to `flounlock.exe -d <project>` from the shell. |
 | `E/11029` | error | `Failed unknown file type No reader for this file type — <project_dir>` | `floserv.exe` fell through to the translator code path with the project directory name treated as a filename. **The defining symptom of the broken `flotherm.bat -b` flag (ISSUE-001).** | Don't go through `flotherm.bat -b`; use direct `translator.exe -p <project>` + `solexe.exe -p <project>`. Treat as fatal. |
+| `E/11055` | error | `Cannot save using default project name DefaultSI` | `Solve > Solve` was triggered on the unsaved default project. Flotherm opens `Save Project`; accepting the default name fails, and the solve may continue far enough to emit downstream grid errors such as `E/9012`. | Treat as a project setup failure. Cancel/close the Save Project and Message Window UI, surface `gui_log_errors`, and require a real project name/import before retrying. |
 | `E/15105` | error | `Failed to load project: <project_name>` | The project doesn't exist in `FLOUSERDIR`, or its `group.cat` / `PDProject` is corrupted. Often paired with `E/11013` when a stale lock blocks a re-load attempt. | If preceded by `E/11013`, retry after `<project_unlock>`. Otherwise treat as fatal; verify the project directory exists and contains `PDProject/group`. |
 
 ### `E/15xxx` — FloSCRIPT runtime
@@ -95,7 +96,7 @@ def parse_logfile_xml(path):
 
 For `floerror.log` the same regex works against each line (no XML envelope).
 
-The sim-cli driver's `lib/error_log.py` parses `floerror.log` today via string-match patterns. This catalogue is the prerequisite for an upcoming `tail_logfile_xml()` helper to bring the GUI log into the same pipeline.
+The driver's `lib/error_log.py` parser is used by both `parse_error_log()` for `floerror.log` and `tail_logfile_xml()` for GUI session logs. `play_floscript()` baselines the GUI log before playback and reports only newly observed entries for that run.
 
 ## Refresh for another version
 
