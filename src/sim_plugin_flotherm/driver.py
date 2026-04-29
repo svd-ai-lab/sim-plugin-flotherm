@@ -240,6 +240,11 @@ class FlothermDriver:
         if matches:
             return matches[0]
 
+        if info:
+            install_schema_dir = Path(info.get("install_root", "")) / "WinXP" / "lib"
+            if (install_schema_dir / "FloSCRIPTSchema.xsd").is_file():
+                return install_schema_dir
+
         return None
 
     def connect(self) -> ConnectionInfo:
@@ -407,6 +412,7 @@ class FlothermDriver:
           - A path to a .pack file → load_project() + play FloSCRIPT to open in GUI
           - A path to a .xml FloSCRIPT → play it via GUI automation
           - "solve" → generate solve FloSCRIPT and play via GUI
+          - "solve_menu" → click Solve > Solve in the GUI
           - "status" → query_status()
         """
         text = code.strip()
@@ -449,15 +455,47 @@ class FlothermDriver:
                     "gui": gui_result,
                     "error": gui_result.get("error", "GUI project import failed"),
                 }
+            self._sync_active_project_from_workspace()
             return {"ok": True, "action": "import_project", **result, "gui": gui_result}
 
         # .xml FloSCRIPT → play via GUI automation
         if text.lower().endswith(".xml") and os.path.isfile(text):
+            lint_result = self.lint(Path(text))
+            lint_errors = [
+                diagnostic for diagnostic in lint_result.diagnostics
+                if diagnostic.level == "error"
+            ]
+            if lint_errors:
+                return {
+                    "ok": False,
+                    "action": "lint_floscript",
+                    "script": text,
+                    "diagnostics": [
+                        {
+                            "level": diagnostic.level,
+                            "message": diagnostic.message,
+                            "line": diagnostic.line,
+                        }
+                        for diagnostic in lint_result.diagnostics
+                    ],
+                    "error": "FloSCRIPT lint failed; not dispatching to GUI",
+                }
             gui_result = self._play_floscript(text)
+            if gui_result.get("ok", False):
+                self._sync_active_project_from_workspace()
             return {
                 "ok": gui_result.get("ok", False),
                 "action": "play_floscript",
                 "script": text,
+                "gui": gui_result,
+            }
+
+        # "solve_menu" → click Solve > Solve via GUI automation
+        if text.lower() in ("solve_menu", "solve-menu"):
+            gui_result = self._trigger_solve_menu()
+            return {
+                "ok": gui_result.get("ok", False),
+                "action": "solve_menu",
                 "gui": gui_result,
             }
 
@@ -580,7 +618,23 @@ class FlothermDriver:
         """Trigger Macro > Play FloSCRIPT via Win32 GUI automation."""
         try:
             from ._win32_backend import play_floscript
-            return play_floscript(script_path)
+            install_root = None
+            if self._session:
+                install_root = self._session.get("install_root")
+            return play_floscript(script_path, install_root=install_root)
+        except ImportError:
+            return {"ok": False, "error": "Win32 backend not available (not on Windows)"}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def _trigger_solve_menu(self) -> dict:
+        """Trigger Solve > Solve via Win32 GUI automation."""
+        try:
+            from ._win32_backend import trigger_solve_menu
+            install_root = None
+            if self._session:
+                install_root = self._session.get("install_root")
+            return trigger_solve_menu(install_root=install_root)
         except ImportError:
             return {"ok": False, "error": "Win32 backend not available (not on Windows)"}
         except Exception as e:
@@ -623,6 +677,52 @@ class FlothermDriver:
         }
         self._session["active_project"] = proj_dir
         return self._project
+
+    def _discover_latest_project(self) -> dict | None:
+        """Infer the active project from workspace directories written by Flotherm."""
+        if not self._session:
+            return None
+        workspace = Path(self._session.get("workspace", ""))
+        if not workspace.is_dir():
+            return None
+
+        candidates: list[tuple[float, Path]] = []
+        for path in workspace.iterdir():
+            if not path.is_dir():
+                continue
+            project_group = path / "PDProject" / "group"
+            if not project_group.is_file():
+                continue
+            try:
+                stamp = max(path.stat().st_mtime, project_group.stat().st_mtime)
+            except OSError:
+                continue
+            candidates.append((stamp, path))
+        if not candidates:
+            return None
+
+        _, project_path = max(candidates, key=lambda item: item[0])
+        project_dir = project_path.name
+        scenario_root = project_path / "Scenarios"
+        return {
+            "project_dir": project_dir,
+            "project_name": pack_project_name(project_dir),
+            "workspace": str(workspace),
+            "source": "workspace_discovery",
+            "pack_path": None,
+            "scenario_dirs": sorted(
+                p.name for p in scenario_root.iterdir() if p.is_dir()
+            ) if scenario_root.is_dir() else [],
+        }
+
+    def _sync_active_project_from_workspace(self) -> dict | None:
+        project = self._discover_latest_project()
+        if project is None:
+            return None
+        self._project = project
+        if self._session is not None:
+            self._session["active_project"] = project["project_dir"]
+        return project
 
     def submit_job(self, *, label: str = "solve", script: str | Path | None = None) -> dict:
         """Submit a solve job for the active project."""

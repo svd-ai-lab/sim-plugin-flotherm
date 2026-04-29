@@ -539,22 +539,23 @@ doesn't.
 
 ---
 
-## Schema is structural only — check the Message Window dock for runtime errors
+## Schema is structural only — check GUI-log errors after playback
 
 **Critical gotcha:** `sim lint` validates the XSD, but the XSD declares
 `property_name` as `xs:string` — any string passes. Flotherm validates the
-actual property names at **runtime**, and on rejection prints to a dock
-widget inside the main window (not a top-level popup):
+actual property names at **runtime**, and on rejection writes the error to
+both the GUI session log and a dock widget inside the main window:
 
 ```
 ERROR E/15002 - Command failed to find property: <name>
 WARN  W/15000 - Aborting XML due to previous error
 ```
 
-**The `sim exec` response does NOT surface these errors.** `dismissed_popups`
-is empty because the Message Window is a `flohelp::DockWidget` embedded in
-`FloMainWindow`, not a top-level `Window`. So `[OK] elapsed=0s` can hide a
-total failure. **Always read the dock after every `sim exec` of a FloSCRIPT.**
+Recent driver versions surface newly observed GUI log entries in the `sim exec`
+response under `gui.gui_log` and `gui.gui_log_errors`; those are the primary
+error channel. `dismissed_popups` can still be empty because the Message Window
+is a `flohelp::DockWidget` embedded in `FloMainWindow`, not a top-level
+`Window`. If the structured GUI log is inconclusive, read the dock manually.
 
 ### Reading the Message Window dock via UIA
 

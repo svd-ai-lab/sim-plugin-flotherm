@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 
 from sim_plugin_flotherm._helpers import list_logfile_xmls, tail_logfile_xml
+from sim_plugin_flotherm._win32_backend import _new_log_entries
 
 
 def _write_logfile(path: Path, messages: list[str]) -> None:
@@ -103,3 +104,35 @@ def test_tail_logfile_xml_propagates_suggested_action(tmp_path: Path) -> None:
     assert len(out) == 1
     assert out[0]["code"] == "E/11029"
     assert "translator.exe" in out[0]["suggested_action"]
+
+
+def test_new_log_entries_ignores_baseline_entries() -> None:
+    baseline = [
+        {
+            "code": "E/15002",
+            "severity": "error",
+            "message": "old property failure",
+            "raw": "ERROR   E/15002 - old property failure",
+        }
+    ]
+    after = baseline + [
+        {
+            "code": "W/15000",
+            "severity": "warning",
+            "message": "Aborting XML due to previous error",
+            "raw": "WARN    W/15000 - Aborting XML due to previous error",
+        }
+    ]
+
+    assert _new_log_entries(baseline, after) == [after[1]]
+
+
+def test_new_log_entries_preserves_duplicate_new_errors() -> None:
+    entry = {
+        "code": "E/15002",
+        "severity": "error",
+        "message": "same property failure",
+        "raw": "ERROR   E/15002 - same property failure",
+    }
+
+    assert _new_log_entries([entry], [entry, entry]) == [entry]
