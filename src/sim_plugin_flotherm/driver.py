@@ -41,6 +41,7 @@ from ._helpers import (
     detect_job_state,
     find_installation,
     snapshot_result_files,
+    tail_logfile_xml,
 )
 from .lib import (
     build_solve_and_save,
@@ -49,6 +50,7 @@ from .lib import (
     lint_pack,
     pack_project_dir,
     pack_project_name,
+    parse_error_log,
     read_floerror_log,
 )
 
@@ -313,6 +315,12 @@ class FlothermDriver:
         Locates installation, sets up workspace, optionally launches GUI.
         Returns session info dict.
         """
+        if ui_mode == "no_gui":
+            raise RuntimeError(
+                "Flotherm does not support ui_mode='no_gui'. "
+                "Start from an interactive desktop/RDP session with ui_mode='gui'."
+            )
+
         if self._session and self._session.get("state") == "ready":
             raise RuntimeError("Session already active. Call disconnect() first.")
 
@@ -678,12 +686,24 @@ class FlothermDriver:
         proc_alive = False
         if self._session and self._session.get("process_pid"):
             proc_alive = is_process_alive(self._session["process_pid"])
+        logs: dict[str, list[dict]] = {
+            "floerror": [],
+            "gui_log": [],
+        }
+        if self._session:
+            workspace = self._session.get("workspace")
+            install_root = self._session.get("install_root")
+            if workspace:
+                logs["floerror"] = parse_error_log(workspace)
+            if install_root:
+                logs["gui_log"] = tail_logfile_xml(install_root)
         return {
             "session": self._session,
             "active_project": self._project,
             "last_job": last_job,
             "total_jobs": len(self._jobs),
             "process_alive": proc_alive,
+            "logs": logs,
         }
 
     def query_artifacts(self, job_id: str | None = None) -> dict:

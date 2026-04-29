@@ -22,10 +22,12 @@ classifiers = [
     "Operating System :: Microsoft :: Windows",
 ]
 dependencies = [
-    # sim-runtime brings the runtime contract (sim.driver, sim.runner,
+    # sim-cli-core brings the runtime contract (sim.driver, sim.runner,
     # sim.inspect, sim.gui, sim.compat) plus pywinauto on win32 — Flotherm
     # has no batch API, so the driver is a pywinauto-driven GUI automation.
-    "sim-runtime @ git+https://github.com/svd-ai-lab/sim-cli@main",
+    "sim-cli-core @ git+https://github.com/svd-ai-lab/sim-cli@main",
+    "numpy>=1.26",
+    "psutil>=5.9",
 ]
 
 [project.optional-dependencies]
@@ -44,10 +46,13 @@ Homepage = "https://github.com/svd-ai-lab/sim-plugin-flotherm"
 Issues = "https://github.com/svd-ai-lab/sim-plugin-flotherm/issues"
 
 [tool.hatch.metadata]
-# Required because `sim-runtime` is pinned to a git+https URL — sim-cli is
+# Required because `sim-cli-core` is pinned to a git+https URL — sim-cli is
 # distributed via GitHub, not PyPI. See sim-proj memory: plugin distribution
 # is GitHub-only.
 allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/sim_plugin_flotherm"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -10,11 +10,13 @@ import sys
 
 
 def test_lib_imports_without_pywinauto():
-    # Re-import the lib package and snapshot loaded modules. None of the
-    # GUI-coupled or Windows-only deps should appear.
-    import sim_plugin_flotherm.lib  # noqa: F401
+    # Snapshot loaded modules around the import. Some test runners on Windows
+    # load ctypes.wintypes themselves, so only modules newly pulled in by lib/
+    # indicate a boundary violation.
     forbidden = {"pywinauto", "ctypes.wintypes", "win32api", "win32con"}
-    found = forbidden.intersection(sys.modules)
+    before = forbidden.intersection(sys.modules)
+    import sim_plugin_flotherm.lib  # noqa: F401
+    found = forbidden.intersection(sys.modules) - before
     assert not found, f"lib/ pulled in GUI deps: {found}"
 
 

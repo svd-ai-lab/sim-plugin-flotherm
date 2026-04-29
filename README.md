@@ -38,8 +38,8 @@ flotherm = "sim_plugin_flotherm:skills_dir"
 ```bash
 git clone https://github.com/svd-ai-lab/sim-plugin-flotherm
 cd sim-plugin-flotherm
-uv sync
-uv run pytest
+uv sync --extra test
+uv run --extra test python -m pytest
 ```
 
 Note: Tier-4 (real Flotherm) tests require Windows + a licensed Simcenter Flotherm install. Tier-1 / Tier-2 tests (detect, lint, FloSCRIPT/FloXML builders) run on macOS / Linux.
