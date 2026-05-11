@@ -123,7 +123,7 @@ Win32 ctypes: fill file dialog (control ID 1148) → click Open (IDOK)
 Verified end-to-end: connect → import pack → solve (153K cells, converged) → disconnect.
 
 Key requirements:
-- `sim serve` must run in an interactive desktop session (not SSH session 0)
+- `uv run sim serve` must run in an interactive desktop session (not SSH session 0)
 - UIA operations must run in a **subprocess** (COM state corrupts after `invoke()` COMError)
 - `pywinauto` must be installed in the sim-cli venv (`uv pip install pywinauto`)
 
@@ -218,7 +218,7 @@ File a bug report citing the FloSCRIPTv11 tutorial PDF (shipped in the install) 
 
 ---
 
-## ISSUE-002: `sim lint` fails on .pack files via CLI (pybamm detect UnicodeDecodeError)
+## ISSUE-002: `uv run sim lint` fails on .pack files via CLI (pybamm detect UnicodeDecodeError)
 
 **Date discovered**: 2026-04-01  
 **Severity**: Low — workaround available  
@@ -226,7 +226,7 @@ File a bug report citing the FloSCRIPTv11 tutorial PDF (shipped in the install) 
 
 ### Symptom
 
-`sim lint Mobile_Demo.pack` via CLI crashes because `pybamm` driver's `detect()` calls `read_text()` on the binary .pack file, causing `UnicodeDecodeError`.
+`uv run sim lint Mobile_Demo.pack` via CLI crashes because `pybamm` driver's `detect()` calls `read_text()` on the binary .pack file, causing `UnicodeDecodeError`.
 
 ### Workaround
 
@@ -238,19 +238,19 @@ result = FlothermDriver().lint(Path("my_project.pack"))
 
 Or use `--solver flotherm` to skip auto-detection:
 ```bash
-sim lint --solver flotherm my_project.pack
+uv run sim lint --solver flotherm my_project.pack
 ```
 
 ## ISSUE-004: FloSCRIPT runtime errors surface in a dock, not a popup
 
 **Date discovered**: 2026-04-17
-**Severity**: High — invisible failures in `sim exec`
+**Severity**: High — invisible failures in `uv run sim exec`
 **Status**: Workaround documented; driver-side fix proposed
 
 ### Symptom
 
 A FloSCRIPT with a bad `property_name` (or any runtime error) fails silently
-as far as `sim exec` is concerned:
+as far as `uv run sim exec` is concerned:
 
 ```json
 {"ok": true, "action": "play_floscript", "gui": {"ok": true,
