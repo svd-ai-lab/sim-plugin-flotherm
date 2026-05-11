@@ -33,14 +33,14 @@ ctypes (standard file dialogs).
 All vendor-documented CLI playback modes are broken in Flotherm 2504 (see `known_issues.md` ISSUE-001). GUI automation via pywinauto UIA is the only verified end-to-end working path for `.pack` import, FloSCRIPT playback, and first-time project creation/modification.
 
 ```bash
-sim connect --solver flotherm --ui-mode gui     # launch Flotherm GUI (needs RDP/interactive desktop)
-sim exec '<path>.pack'                          # import pack into GUI
-sim exec 'solve'                                # run CFD solve
-sim exec 'status'                               # query session state
-sim disconnect                                  # kill all processes
+uv run sim connect --solver flotherm --ui-mode gui     # launch Flotherm GUI (needs RDP/interactive desktop)
+uv run sim exec '<path>.pack'                          # import pack into GUI
+uv run sim exec 'solve'                                # run CFD solve
+uv run sim exec 'status'                               # query session state
+uv run sim disconnect                                  # kill all processes
 ```
 
-**Requirements**: `sim serve` must run in an interactive desktop session (RDP, not SSH session 0). The GUI binary needs a real desktop to render Qt widgets.
+**Requirements**: `uv run sim serve` must run in an interactive desktop session (RDP, not SSH session 0). The GUI binary needs a real desktop to render Qt widgets.
 
 ### Direct batch — headless optimization for re-solves only
 
@@ -76,7 +76,7 @@ solexe.exe -p "<FLOUSERDIR>\<project>.<GUID>"           :: run CFD solver
 ### How GUI automation works
 
 ```
-sim exec → driver.run() → _play_floscript(script_path)
+uv run sim exec → driver.run() → _play_floscript(script_path)
   ├─ subprocess: pywinauto UIA expand() Macro → invoke() Play FloSCRIPT
   │  (invoke blocks due to modal dialog; subprocess killed after timeout)
   └─ main process: Win32 ctypes fills file dialog → clicks Open
@@ -146,13 +146,13 @@ FloSCRIPT XML step by step. See `base/reference/floscript_modeling.md`
 for the full command reference, common patterns, and pitfalls.
 
 ```bash
-sim connect --solver flotherm --ui-mode gui
-sim lint step1.xml                          # XSD validates automatically
-sim exec step1.xml                          # create geometry + save checkpoint
-sim lint step2.xml
-sim exec step2.xml                          # add sources + save checkpoint
-sim exec 'solve'                            # run CFD
-sim disconnect
+uv run sim connect --solver flotherm --ui-mode gui
+uv run sim lint step1.xml                          # XSD validates automatically
+uv run sim exec step1.xml                          # create geometry + save checkpoint
+uv run sim lint step2.xml
+uv run sim exec step2.xml                          # add sources + save checkpoint
+uv run sim exec 'solve'                            # run CFD
+uv run sim disconnect
 ```
 
 Each step is a separate FloSCRIPT file with `<project_save_as>` at the
@@ -163,7 +163,7 @@ typos and structural errors with line numbers.
 
 1. **GUI must be visible.** The automation uses pywinauto UIA which
    requires the Flotherm window to be in an interactive desktop session.
-   `sim serve` must be started from RDP, not SSH.
+   `uv run sim serve` must be started from RDP, not SSH.
 2. **Don't open Flotherm by hand while sim is using it.** UIA element
    discovery races with user input. Let the driver own the lifecycle.
 3. **UIA must run in a subprocess.** `invoke()` on Qt menu items throws
@@ -177,11 +177,11 @@ typos and structural errors with line numbers.
 
 ## Required protocol
 
-1. `sim connect --solver flotherm --ui-mode gui` — launches Flotherm
-2. `sim exec '<path>.pack'` — imports pack (uses `project_import` FloSCRIPT with `import_type="Pack File"`)
-3. `sim exec 'solve'` — plays `<start start_type="solver"/>` FloSCRIPT
+1. `uv run sim connect --solver flotherm --ui-mode gui` — launches Flotherm
+2. `uv run sim exec '<path>.pack'` — imports pack (uses `project_import` FloSCRIPT with `import_type="Pack File"`)
+3. `uv run sim exec 'solve'` — plays `<start start_type="solver"/>` FloSCRIPT
 4. Verify solve completed: check Message Window for `I/9001 - Solver stopped: steady solution converged`
-5. `sim disconnect` — kills floserv, floview, flotherm
+5. `uv run sim disconnect` — kills floserv, floview, flotherm
 
 ---
 

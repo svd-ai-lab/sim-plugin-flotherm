@@ -21,20 +21,20 @@
 ---
 
 Generate Flotherm models from natural language by producing FloSCRIPT
-XML that `sim exec` plays step by step. Each step is a separate file
-validated via `sim lint` before playback.
+XML that `uv run sim exec` plays step by step. Each step is a separate file
+validated via `uv run sim lint` before playback.
 
 ## Workflow
 
 ```
-sim connect --solver flotherm --ui-mode gui
+uv run sim connect --solver flotherm --ui-mode gui
 # For each step:
 #   1. Generate stepN.xml
 #   2. sim lint stepN.xml          ← XSD validates automatically
-#   3. sim exec stepN.xml          ← plays in Flotherm GUI
+#   3. uv run sim exec stepN.xml          ← plays in Flotherm GUI
 #   4. sim screenshot              ← verify visually
 # When done:
-sim disconnect
+uv run sim disconnect
 ```
 
 ## Step Template
@@ -104,12 +104,12 @@ The "schema-valid but runtime-no-op" risk that sank `<load_from_library>` (ISSUE
 
 ### Caveats from verification
 
-- **`<project_load project_name="…"/>` requires the project to already be registered in `group.cat`** (per the canonical `base/workflows/solve_mobile_demo.xml` note). Loading a brand-new project from a fresh `sim connect` session produces `E/15105 - Failed to load project`. If you want the orchestrator to load a project, use `<project_import>` first or pre-register via the GUI.
+- **`<project_load project_name="…"/>` requires the project to already be registered in `group.cat`** (per the canonical `base/workflows/solve_mobile_demo.xml` note). Loading a brand-new project from a fresh `uv run sim connect` session produces `E/15105 - Failed to load project`. If you want the orchestrator to load a project, use `<project_import>` first or pre-register via the GUI.
 - **The driver's `ok` flag flips false on `<quit/>`-bearing scripts** because Flotherm closes underneath the session. Expected — re-`connect` for follow-up commands.
 
 ## Error triage
 
-When playback fails, runtime errors land in the Message Window dock and `floerror.log`. The catalogue of every `E/<NNNNN>` / `W/<NNNNN>` / `I/<NNNNN>` code observed on 2504, with severity, message template, condition, and suggested driver action, is in [`error_codes.md`](error_codes.md). Read it before retrying a failed `sim exec`.
+When playback fails, runtime errors land in the Message Window dock and `floerror.log`. The catalogue of every `E/<NNNNN>` / `W/<NNNNN>` / `I/<NNNNN>` code observed on 2504, with severity, message template, condition, and suggested driver action, is in [`error_codes.md`](error_codes.md). Read it before retrying a failed `uv run sim exec`.
 
 ## Command Reference
 
@@ -176,7 +176,7 @@ Set size, position, material, power, or any property:
 **Common properties:**
 
 > **⚠ Many property names in this table are UNVERIFIED against Flotherm 2504.**
-> The XSD declares `property_name` as `xs:string` — bad names pass `sim lint`
+> The XSD declares `property_name` as `xs:string` — bad names pass `uv run sim lint`
 > and only fail at runtime with `ERROR E/15002 - Command failed to find property`.
 > Verified on 2026-04-17: `sizeX/Y/Z` and `positionX/Y/Z` work on both `cuboid`
 > and `source`. Everything else below should be confirmed by recording FloSCRIPT
@@ -523,9 +523,9 @@ doesn't.
 3. **`position_in_parent` is required** even when referencing by name.
    It's the creation order index (0-based) under the parent assembly.
 
-4. **Lint before play.** `sim lint stepN.xml` catches typos in
+4. **Lint before play.** `uv run sim lint stepN.xml` catches typos in
    geometry_type, unknown commands, and structural errors — with line
-   numbers. Fix all errors before `sim exec`.
+   numbers. Fix all errors before `uv run sim exec`.
 
 5. **One step per file** for the iterate loop. Don't put the entire
    model in one file — if step 5 fails, you'd have to regenerate
@@ -541,7 +541,7 @@ doesn't.
 
 ## Schema is structural only — check GUI-log errors after playback
 
-**Critical gotcha:** `sim lint` validates the XSD, but the XSD declares
+**Critical gotcha:** `uv run sim lint` validates the XSD, but the XSD declares
 `property_name` as `xs:string` — any string passes. Flotherm validates the
 actual property names at **runtime**, and on rejection writes the error to
 both the GUI session log and a dock widget inside the main window:
@@ -551,7 +551,7 @@ ERROR E/15002 - Command failed to find property: <name>
 WARN  W/15000 - Aborting XML due to previous error
 ```
 
-Recent driver versions surface newly observed GUI log entries in the `sim exec`
+Recent driver versions surface newly observed GUI log entries in the `uv run sim exec`
 response under `gui.gui_log` and `gui.gui_log_errors`; those are the primary
 error channel. `dismissed_popups` can still be empty because the Message Window
 is a `flohelp::DockWidget` embedded in `FloMainWindow`, not a top-level
@@ -592,7 +592,7 @@ across runs — clear it via the "Clear" button if you want per-run isolation.
 When Flotherm aborts on E/15002, commands that played BEFORE the bad line
 are already applied (renames, creates, size/position changes). Re-running
 from the top without clearing state produces duplicate geometry.
-Either `sim disconnect` + reconnect, or `<delete_geometry>` the previous
+Either `uv run sim disconnect` + reconnect, or `<delete_geometry>` the previous
 artifacts, before retrying.
 
 ---

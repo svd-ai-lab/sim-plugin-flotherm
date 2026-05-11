@@ -2,22 +2,33 @@
 
 [Simcenter Flotherm](https://plm.sw.siemens.com/en-US/simcenter/mechanical-simulation/flotherm/) driver for [sim-cli](https://github.com/svd-ai-lab/sim-cli), distributed as an out-of-tree plugin via Python `entry_points`.
 
-Flotherm is closed-source commercial thermal-CFD software from Siemens. This plugin **does not bundle any vendor binaries, SDKs, or licenses** — users must install Simcenter Flotherm separately and supply their own license. See [LICENSE-NOTICE.md](LICENSE-NOTICE.md).
+This plugin does not bundle Flotherm, vendor binaries, or vendor SDKs. See
+[LICENSE-NOTICE.md](LICENSE-NOTICE.md).
 
 The driver is Windows-only — Flotherm itself only ships on Windows, and the driver uses `pywinauto` GUI automation (Flotherm has no headless batch API for first-time project setup).
 
 ## Install
 
-```bash
-pip install git+https://github.com/svd-ai-lab/sim-plugin-flotherm@main
+For agent projects, install sim-cli-core and the Flotherm plugin in the project
+environment:
+
+```powershell
+uv init  # only if this is not already a uv project
+uv add sim-cli-core "git+https://github.com/svd-ai-lab/sim-plugin-flotherm@main"
+uv run sim plugin sync-skills --target .agents/skills --copy
+uv run sim check flotherm
+uv run sim plugin doctor flotherm --deep
 ```
 
-After install, sim-cli auto-discovers the driver:
+For Claude Code, sync the bundled skill to `.claude/skills` instead:
 
-```bash
-sim drivers | grep flotherm
-sim run --solver flotherm path/to/project.pack
+```powershell
+uv run sim plugin sync-skills --target .claude/skills --copy
 ```
+
+`uv run sim ...` runs sim from this project environment, so it sees this
+project's plugins. Without uv, create and activate a venv, then install
+`sim-cli-core` plus this plugin with `python -m pip`.
 
 ## How it works
 
@@ -42,7 +53,9 @@ uv sync --extra test
 uv run --extra test python -m pytest --basetemp=.tmp/pytest-basetemp
 ```
 
-Note: Tier-4 (real Flotherm) tests require Windows + a licensed Simcenter Flotherm install. Tier-1 / Tier-2 tests (detect, lint, FloSCRIPT/FloXML builders) run on macOS / Linux.
+Note: Tier-4 (real Flotherm) tests require Windows and a local Flotherm
+installation. Tier-1 / Tier-2 tests (detect, lint, FloSCRIPT/FloXML builders)
+run on macOS / Linux.
 
 ## Windows smoke
 
