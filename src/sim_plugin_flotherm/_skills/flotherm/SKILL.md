@@ -13,7 +13,7 @@ The `/connect` response told you which active layer applies via:
 
 ```json
 "skills": {
-  "root":               "<sim-skills>/flotherm",
+  "root":               "<sim-plugin-flotherm>/_skills/flotherm",
   "active_sdk_layer":   null,        // Flotherm has no Python SDK
   "active_solver_layer":"2504"       // or "2412" / "2406"
 }
@@ -121,7 +121,7 @@ for the inline driver. Not loaded during a normal session.
 
 This skill's workflow scripts and `skill_tests/` reference vendor-shipped
 demo models by the paths where they live inside a local Flotherm install.
-The sim-skills repo does **not** bundle any of that content (it is
+This skill does **not** bundle any of that content (it is
 proprietary Siemens / Mentor Graphics material and was removed under
 issue #2 for IP compliance). To reproduce the tests, point the helpers at
 your own Flotherm 2504 install — default on Windows is
@@ -207,5 +207,5 @@ controller = GuiController(process_name_substrings=("flotherm", "flomain"))
 print(controller.list_windows())
 ```
 
-See [`sim-skills/sim-cli/gui/SKILL.md`](../sim-cli/gui/SKILL.md) for the
+See [the sim-cli `gui` skill](../sim-cli/gui/SKILL.md) for the
 full API reference.
