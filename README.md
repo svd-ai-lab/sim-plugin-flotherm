@@ -1,3 +1,8 @@
+> [!IMPORTANT]
+> **This repository has moved.** `sim-plugin-flotherm` is now developed in [svd-ai-lab/sim-cli](https://github.com/svd-ai-lab/sim-cli/tree/main/plugins/flotherm) under `plugins/flotherm`. This repository is archived and read-only; please open issues and pull requests in sim-cli.
+>
+> Install: `uv add sim-cli-core "sim-plugin-flotherm @ git+https://github.com/svd-ai-lab/sim-cli.git#subdirectory=plugins/flotherm"`
+
 # sim-plugin-flotherm
 
 [Simcenter Flotherm](https://plm.sw.siemens.com/en-US/simcenter/mechanical-simulation/flotherm/) driver for [sim-cli](https://github.com/svd-ai-lab/sim-cli), distributed as an out-of-tree plugin via Python `entry_points`.
